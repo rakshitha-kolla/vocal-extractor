@@ -60,12 +60,34 @@ function App() {
         },
       });
 
-      setResult(response.data);
+      const { job_id } = response.data;
+      pollStatus(job_id);
     } catch (err) {
       console.error('Upload error:', err);
-      setError(err.response?.data?.detail || 'An error occurred during processing. Please try again.');
-    } finally {
+      setError(err.response?.data?.detail || 'An error occurred during upload. Please try again.');
       setLoading(false);
+    }
+  };
+
+  const pollStatus = async (jobId) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/status/${jobId}`);
+      const data = response.data;
+
+      if (data.status === 'completed') {
+        setResult(data);
+        setLoading(false);
+      } else if (data.status === 'failed') {
+        setError(data.error || 'Processing failed. The file might be too large or the server ran out of memory.');
+        setLoading(false);
+      } else {
+        // Poll again in 3 seconds
+        setTimeout(() => pollStatus(jobId), 3000);
+      }
+    } catch (err) {
+      console.error('Polling error:', err);
+      // Don't immediately fail on a single polling error, try again
+      setTimeout(() => pollStatus(jobId), 5000);
     }
   };
 

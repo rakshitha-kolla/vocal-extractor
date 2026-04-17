@@ -59,8 +59,35 @@ def health():
     return {"status": "healthy"}
 
 
+from fastapi import BackgroundTasks
+
+# Store job status
+jobs = {}
+
+def process_audio_task(job_id, input_path, original_filename):
+    try:
+        jobs[job_id] = {"status": "processing", "original_filename": original_filename}
+        start_time = time.time()
+        
+        # Call the denoise service
+        cleaned_path = denoise.denoise_audio(input_path, OUTPUT_DIR)
+        
+        latency = time.time() - start_time
+        result_filename = os.path.basename(cleaned_path)
+        
+        jobs[job_id] = {
+            "status": "completed",
+            "original_filename": original_filename,
+            "result_url": f"/outputs/{result_filename}",
+            "processing_time": f"{latency:.2f}s"
+        }
+        print(f"Job {job_id} completed in {latency:.2f}s")
+    except Exception as e:
+        print(f"Error in job {job_id}: {str(e)}")
+        jobs[job_id] = {"status": "failed", "error": str(e)}
+
 @app.post("/extract-vocals")
-async def extract_vocals(file: UploadFile = File(...)):
+async def extract_vocals(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     # Validate file type
     if not file.content_type.startswith("audio/"):
         raise HTTPException(status_code=400, detail="File must be an audio file")
@@ -77,36 +104,18 @@ async def extract_vocals(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save upload: {str(e)}")
 
-    try:
-        # Step: Extract Vocals
-        print(f"\n Processing job {job_id}: {file.filename}")
-        start_time = time.time()
-        
-        # Call the denoise service which extracts vocals
-        # The service returns the path to the cleaned file
-        cleaned_path = denoise.denoise_audio(input_path, OUTPUT_DIR)
-        
-        latency = time.time() - start_time
-        print(f"   Extraction latency : {latency:.3f}s")
+    # Start background task
+    jobs[job_id] = {"status": "pending", "original_filename": file.filename}
+    background_tasks.add_task(process_audio_task, job_id, input_path, file.filename)
+    
+    return {"job_id": job_id, "status": "pending"}
 
-        # Get the relative path for the URL
-        result_filename = os.path.basename(cleaned_path)
-        result_url = f"/outputs/{result_filename}"
 
-        return {
-            "job_id": job_id,
-            "original_filename": file.filename,
-            "result_url": result_url,
-            "processing_time": f"{latency:.2f}s"
-        }
-
-    except Exception as e:
-        print(f"Error processing audio: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
-    finally:
-        # Optional: cleanup input file if needed
-        # os.remove(input_path)
-        pass
+@app.get("/status/{job_id}")
+async def get_status(job_id: str):
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return jobs[job_id]
 
 
 from fastapi.responses import FileResponse
