@@ -75,7 +75,8 @@ def denoise_audio(
             model,
             waveform[None],
             split=True,
-            overlap=0.25,
+            overlap=0.1,
+            shifts=1
         )
 
     vocals = sources[0, model.sources.index('vocals')]
