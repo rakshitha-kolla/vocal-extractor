@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Node.js
+node_modules/
+dist/
+.env.local
+.env.*.local
+
+# Project Specific
+data/
+models/
+pretrained_models/
+*.mp3
+*.wav
+*.m4a
+
+# OS files
+.DS_Store
+Thumbs.db

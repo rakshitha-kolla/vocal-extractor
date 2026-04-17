@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: vocal-extraction-api
+    env: docker
+    plan: free # Note: Demucs might require a higher plan due to RAM limits (512MB on free)
+    region: ohio
+    dockerContext: .
+    dockerfilePath: Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+    disk:
+      name: vocal-data
+      mountPath: /app/data
+      sizeGB: 1
