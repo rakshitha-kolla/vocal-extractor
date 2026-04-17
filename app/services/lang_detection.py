@@ -1,4 +1,4 @@
-from speechbrain.inference.classifiers import EncoderClassifier
+from speechbrain.pretrained import EncoderClassifier
 from collections import Counter
 import os
 import torch
