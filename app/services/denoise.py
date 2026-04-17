@@ -8,8 +8,17 @@ import torch
 import tempfile
 import numpy as np
 
-demucs_model = get_model('htdemucs')
-demucs_model.eval()
+import gc
+
+_demucs_model = None
+
+def get_demucs_model():
+    global _demucs_model
+    if _demucs_model is None:
+        print("Loading Demucs model...")
+        _demucs_model = get_model('htdemucs')
+        _demucs_model.eval()
+    return _demucs_model
 
 
 def denoise_audio(
@@ -60,15 +69,16 @@ def denoise_audio(
         pad = sr - waveform.shape[1]
         waveform = torch.nn.functional.pad(waveform, (0, pad))
 
+    model = get_demucs_model()
     with torch.no_grad():
         sources = apply_model(
-            demucs_model,
+            model,
             waveform[None],
             split=True,
             overlap=0.25,
         )
 
-    vocals = sources[0, demucs_model.sources.index('vocals')]
+    vocals = sources[0, model.sources.index('vocals')]
 
     vocals = vocals.mean(dim=0, keepdim=True)
 
@@ -91,6 +101,14 @@ def denoise_audio(
         os.remove(denoised_temp)
 
     print(f"Final cleaned audio saved to: {cleaned_path}")
+    
+    # Aggressively clear memory
+    del waveform
+    del sources
+    del vocals
+    gc.collect()
+    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+    
     return cleaned_path
 
 
